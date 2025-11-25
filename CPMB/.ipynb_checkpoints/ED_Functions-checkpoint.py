@@ -1,3 +1,6 @@
+import numpy as np
+import scipy as sp
+
 def bin(x,N):
     '''
     Return the binary representation of an integer with fixed length.
@@ -138,11 +141,11 @@ def lanczos(H,L = 20,phi = None,return_basis = False):
     '''
     
     #L should not be more than basis size
-    L = min(2**H.shape[0],L)
+    L = min(H.shape[0],L)
     
     #Generating a Random Normalised Vector - psi will be our Krylov Space
     if(phi is None):
-        phi = np.array([np.random.uniform(size = 2**N)])
+        phi = np.array([np.random.uniform(size = H.shape[0])])
     #psi = np.array(np.ones(2**N))
     phi = [phi.T/vec_norm(phi)]
     
@@ -175,7 +178,53 @@ def lanczos(H,L = 20,phi = None,return_basis = False):
     diag = np.array(diag[1:]).flatten()
     offdiag = offdiag[1:]
     
-    #print(diag)
     if(return_basis):
-        return sp.sparse.diags([offdiag,diag,offdiag],offsets = [-1,0,1]),diag, offdiag, phi[:-1]
+        return sp.sparse.diags([offdiag,diag,offdiag],offsets = [-1,0,1]),diag, offdiag, np.column_stack(phi[:-1])
     return sp.sparse.diags([offdiag,diag,offdiag],offsets = [-1,0,1]),diag, offdiag
+
+def spin_z_z1_open(state,N):
+    spins = np.array([1 if (state & (1<<index)) != 0 else -1 for index in range(N)])[::-1]
+    return sum(np.multiply(spins[:-1],spins[1:]))
+
+def Hamiltonian_TFIM_open(J = 1,g = 0.5,N = 3,return_basis = False):
+    '''
+
+    Returns
+    -------
+    H : scipy.sparse.lil_matrix
+    basis : np.array
+    '''
+    states = np.array(range(2**N))
+    
+    H = sp.sparse.lil_matrix((2**N,2**N))
+
+    for state in states:
+        
+        H[state,state] = -J*spin_z_z1_open(state,N)
+        
+        sx = [spin_x(state,s) for s in range(N)]
+        for i in sx:
+            H[state,i] = -g
+    if(return_basis):
+        return H,states
+    return H
+
+
+def groundState_Krylov(J,g,N,L):
+    '''
+    The ground state in original basis of TFIM open using 
+    Lancoz algorithm.
+
+    Returns
+    -------
+    psi : np.array() of size 2**N
+    '''
+    
+    H,basis = Hamiltonian_TFIM_open(J,g,N,return_basis=True)
+    T,diag,offdiag,krylovSpace = lanczos(H,L = L,return_basis=True)
+
+    gs, gs_vec = sp.linalg.eigh_tridiagonal(diag,offdiag)
+    psi = krylovSpace @ gs_vec[:,0]
+    psi = psi/vec_norm(psi)
+
+    return psi
