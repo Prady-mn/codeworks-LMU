@@ -217,6 +217,8 @@ def groundState_Krylov(J,g,N,L):
 
     Returns
     -------
+    gs : int 
+        Ground State energy
     psi : np.array() of size 2**N
     '''
     
@@ -227,4 +229,4 @@ def groundState_Krylov(J,g,N,L):
     psi = krylovSpace @ gs_vec[:,0]
     psi = psi/vec_norm(psi)
 
-    return psi
+    return gs[0],psi
